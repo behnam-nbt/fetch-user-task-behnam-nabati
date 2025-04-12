@@ -10,31 +10,45 @@ import Pagination from '../modules/Pagination';
 import fetchUsers from "@/utils/fetchUsers";
 
 function UserPage({ initialUsers = [] }) {
-  const [users, setUsers] = useState(initialUsers);
-  const [search, setSearch] = useState('');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [sortKey, setSortKey] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [hasData, setHasData] = useState(true);
+  const [users, setUsers] = useState(initialUsers); // State to hold the list of users for the current page
+  const [search, setSearch] = useState(''); // Raw search input from the user
+  const [searchTerm, setSearchTerm] = useState(''); // Debounced version of search input, used for filtering
+  const [sortKey, setSortKey] = useState(null); // Current field to sort by (e.g., name, email, etc.)
+  const [isLoading, setIsLoading] = useState(false); // Loading state for async data fetching
+  const [error, setError] = useState(null); // Stores any error that occurs during data fetch
+  const [hasData, setHasData] = useState(true); // Boolean to track if there's more data (for pagination)
 
-  const [page, setPage] = useState(1); // Default to page 1 initially
+  const [page, setPage] = useState(1); // Current page number
 
-  const dispatch = useDispatch();
-  const modalOpen = useSelector((state) => state.user.modalOpen);
-  const selectedUser = useSelector((state) => state.user.selectedUser);
+  const dispatch = useDispatch(); // Redux hook to dispatch actions
+  const modalOpen = useSelector((state) => state.user.modalOpen); // Redux selector for modal visibility state
+  const selectedUser = useSelector((state) => state.user.selectedUser); // Redux selector for currently selected user
 
-  const router = useRouter(); 
+  const router = useRouter(); // Next.js router for navigation and URL manipulation
 
-  // Get the page query parameter from the URL and set it to state
+  // On first render, read 'page' and 'sort' query params from the URL
+  // and update local state accordingly
   useEffect(() => {
-    const urlPage = new URLSearchParams(window.location.search).get('page');
+    const params = new URLSearchParams(window.location.search);
+    const urlPage = params.get('page');
+    const urlSort = params.get('sort');
+    const urlSearch = params.get('search');
+
     if (urlPage) {
-      setPage(parseInt(urlPage, 10));
+      setPage(parseInt(urlPage, 10)); // convert page to number
+    }
+    const validSortKeys = ['name', 'email', 'username']; // restrict sort keys to known fields
+    if (urlSort && validSortKeys.includes(urlSort)) {
+      setSortKey(urlSort);
+    }
+
+    if (urlSearch) {
+      setSearch(urlSearch);
+      setSearchTerm(urlSearch);
     }
   }, []);
 
-  // Update the URL query parameter when page changes
+  // When the page number changes, update the URL without reloading the page
   useEffect(() => {
     router.push(`?page=${page}`, undefined, { shallow: true });
   }, [page, router]);
@@ -47,11 +61,35 @@ function UserPage({ initialUsers = [] }) {
     return () => clearTimeout(timer);
   }, [search]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+  
+    if (search) {
+      params.set('search', search);
+    } else {
+      params.delete('search');
+    }
+  
+    router.push(`?${params.toString()}`, undefined, { shallow: true });
+  }, [search, router]);
+  
+
   // Sorting logic
   const sortedUsers = useMemo(() => {
     if (!sortKey) return users;
     return [...users].sort((a, b) => a[sortKey].localeCompare(b[sortKey]));
   }, [users, sortKey]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (sortKey) {
+      params.set('sort', sortKey);
+    } else {
+      params.delete('sort');
+    }
+    router.push(`?${params.toString()}`, undefined, { shallow: true });
+  }, [sortKey, router]);
+
 
   // Filtering logic
   const filteredUsers = useMemo(() => {
