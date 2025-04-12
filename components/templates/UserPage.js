@@ -26,53 +26,41 @@ function UserPage({ initialUsers = [] }) {
 
   const router = useRouter(); // Next.js router for navigation and URL manipulation
 
-  // On first render, read 'page' and 'sort' query params from the URL
-  // and update local state accordingly
+  // 1️⃣ Read initial state from URL when component mounts
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
     const urlPage = params.get('page');
     const urlSort = params.get('sort');
     const urlSearch = params.get('search');
 
     if (urlPage) {
-      setPage(parseInt(urlPage, 10)); // convert page to number
+      setPage(parseInt(urlPage, 10)); // Convert page to number
     }
-    const validSortKeys = ['name', 'email', 'username']; // restrict sort keys to known fields
+
+    const validSortKeys = ['name', 'email', 'username'];
     if (urlSort && validSortKeys.includes(urlSort)) {
       setSortKey(urlSort);
     }
 
     if (urlSearch) {
       setSearch(urlSearch);
-      setSearchTerm(urlSearch);
+      setSearchTerm(urlSearch); // Optional: skip debounce on initial load
     }
   }, []);
 
-  // When the page number changes, update the URL without reloading the page
-  useEffect(() => {
-    router.push(`?page=${page}`, undefined, { shallow: true });
-  }, [page, router]);
 
-  // Debounce search
+  // 2️⃣ Sync page, sortKey, and search to the URL
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setSearchTerm(search);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [search]);
+    const params = new URLSearchParams();
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-  
-    if (search) {
-      params.set('search', search);
-    } else {
-      params.delete('search');
-    }
-  
+    if (page) params.set('page', page);
+    if (sortKey) params.set('sort', sortKey);
+    if (search) params.set('search', search);
+
     router.push(`?${params.toString()}`, undefined, { shallow: true });
-  }, [search, router]);
-  
+  }, [page, sortKey, search, router]);
+
 
   // Sorting logic
   const sortedUsers = useMemo(() => {
@@ -80,15 +68,14 @@ function UserPage({ initialUsers = [] }) {
     return [...users].sort((a, b) => a[sortKey].localeCompare(b[sortKey]));
   }, [users, sortKey]);
 
+  // 3️⃣ Debounce search input
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (sortKey) {
-      params.set('sort', sortKey);
-    } else {
-      params.delete('sort');
-    }
-    router.push(`?${params.toString()}`, undefined, { shallow: true });
-  }, [sortKey, router]);
+    const timer = setTimeout(() => {
+      setSearchTerm(search);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
 
 
   // Filtering logic
@@ -100,11 +87,12 @@ function UserPage({ initialUsers = [] }) {
     );
   }, [sortedUsers, searchTerm]);
 
-  // Fetch users on page change
+  // 4️⃣ Fetch users when page changes
   useEffect(() => {
     const loadUsers = async () => {
       setIsLoading(true);
       setError(null);
+
       try {
         const current = await fetchUsers(page);
         const next = await fetchUsers(page + 1);
@@ -117,8 +105,10 @@ function UserPage({ initialUsers = [] }) {
         setIsLoading(false);
       }
     };
+
     loadUsers();
   }, [page]);
+
 
   return (
     <div className="container mx-auto p-4 relative">
